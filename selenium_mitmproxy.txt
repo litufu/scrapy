@@ -1,0 +1,12 @@
+本人之前在做X宝，X评，X团的爬虫项目时，均遇到了获取cookies这个重要的问题，而获取cookies的前提是实现用户登录，登陆的过程就不赘述了，相信大家都遇到了滑块，滚动条等反爬手段，(本人用webdriver破解)，可大厂的技术团队还是给了我们一个更难解决的问题，就是通过js给webdriver请求响应错误信息。那我们的思考路线就是如何让这个js文件功能作废，本人使用的方法是通过 mitmproxy 蔽掉识别 webdriver 标识符的 js 文件。 首先下载mitproxy，pip安装方法：    pip install mitmproxy基本使用方法：给本机设置代理ip 127.0.0.1端口8001（为了让所有流量走mitmproxy）具体方法请百度。2. 启动mitmproxy。windows：mitmdump -p 8001Linux：mitmproxy -p 80013. 打开chrome的开发者工具，找到目标网站是通过哪个js文件控制webdriver相应的， 如：<img src="https://pic3.zhimg.com/50/v2-5fcb08ac3a8172e0c2f026548559934b_hd.jpg" data-size="normal" data-rawwidth="469" data-rawheight="134" data-default-watermark-src="https://pic2.zhimg.com/50/v2-f5feeb388fc30cc739130ad447363fba_hd.jpg" class="origin_image zh-lightbox-thumb" width="469" data-original="https://pic3.zhimg.com/v2-5fcb08ac3a8172e0c2f026548559934b_r.jpg"/>我们发现，是yoda.xxx.js文件在控制webdriver的请求与响应。4. 开始写干扰脚本(DriverPass.py)：import re
+from mitmproxy import ctx
+
+def response(flow): 
+    if '/js/yoda.' in flow.request.url:
+        for webdriver_key in ['webdriver', '__driver_evaluate', '__webdriver_evaluate', '__selenium_evaluate', '__fxdriver_evaluate', '__driver_unwrapped', '__webdriver_unwrapped', '__selenium_unwrapped', '__fxdriver_unwrapped', '_Selenium_IDE_Recorder', '_selenium', 'calledSelenium', '_WEBDRIVER_ELEM_CACHE', 'ChromeDriverw', 'driver-evaluate', 'webdriver-evaluate', 'selenium-evaluate', 'webdriverCommand', 'webdriver-evaluate-response', '__webdriverFunc', '__webdriver_script_fn', '__$webdriverAsyncExecutor', '__lastWatirAlert', '__lastWatirConfirm', '__lastWatirPrompt', '$chrome_asyncScriptInfo', '$cdc_asdjflasutopfhvcZLmcfl_' ]:
+            ctx.log.info('Remove "{}" from {}.'.format(
+            webdriver_key, flow.request.url
+            ))  
+        flow.response.text = flow.response.text.replace('"{}"'.format(webdriver_key), '"NO-SUCH-ATTR"')  
+    flow.response.text = flow.response.text.replace('t.webdriver', 'false')
+    flow.response.text = flow.response.text.replace('ChromeDriver', '')5. 退出刚才的mitmproxy状态，重新用命令行启动mitmproxy干扰脚本 监听8001端口的请求与响应。mitmdump -s DriverPass.py -p 80016. 现在别管mitmproxy，启动webdriver 顺利获得cookies。大功告成，点个赞再走。
